@@ -1,10 +1,12 @@
 import { Card } from "../reducers/gameReducer";
 import { HandType } from "../types/scoreTypes";
+import { ScoreCalculator } from './scoreCalculator';
 
 interface HandEvaluation {
   handType: HandType;
   score: number;
   highCard?: number;
+  calculation?: any;
 }
 
 function hasStraight(values: number[]): boolean {
@@ -50,47 +52,48 @@ export function evaluateHand(cards: Card[]): HandEvaluation {
   const isStraight = hasStraight(uniqueValues);
   const isFlush = hasFlush(cards);
 
+  let handType: HandType;
+  let score: number;
+
   // Evaluate hand type from best to worst
   if (isStraight && isFlush) {
-    return {
-      handType: "straightFlush",
-      score: calculateScore("straightFlush"),
-    };
+    handType = "straightFlush";
+    score = calculateScore("straightFlush");
+  } else if (values.includes(4)) {
+    handType = "fourOfAKind";
+    score = calculateScore("fourOfAKind");
+  } else if (values.includes(3) && values.includes(2)) {
+    handType = "fullHouse";
+    score = calculateScore("fullHouse");
+  } else if (isFlush) {
+    handType = "flush";
+    score = calculateScore("flush");
+  } else if (isStraight) {
+    handType = "straight";
+    score = calculateScore("straight");
+  } else if (values.includes(3)) {
+    handType = "threeOfAKind";
+    score = calculateScore("threeOfAKind");
+  } else if (values.filter((count) => count === 2).length === 2) {
+    handType = "twoPair";
+    score = calculateScore("twoPair");
+  } else if (values.includes(2)) {
+    handType = "pair";
+    score = calculateScore("pair");
+  } else {
+    handType = "highCard";
+    score = calculateScore("highCard");
   }
 
-  if (values.includes(4)) {
-    return { handType: "fourOfAKind", score: calculateScore("fourOfAKind") };
-  }
+  // After determining hand type, calculate score with bonuses
+  const calculator = new ScoreCalculator(handType, cards);
+  const scoreCalculation = calculator.calculateScore(cards);
 
-  if (values.includes(3) && values.includes(2)) {
-    return { handType: "fullHouse", score: calculateScore("fullHouse") };
-  }
-
-  if (isFlush) {
-    return { handType: "flush", score: calculateScore("flush") };
-  }
-
-  if (isStraight) {
-    return { handType: "straight", score: calculateScore("straight") };
-  }
-
-  if (values.includes(3)) {
-    return { handType: "threeOfAKind", score: calculateScore("threeOfAKind") };
-  }
-
-  if (values.filter((count) => count === 2).length === 2) {
-    return { handType: "twoPair", score: calculateScore("twoPair") };
-  }
-
-  if (values.includes(2)) {
-    return { handType: "pair", score: calculateScore("pair") };
-  }
-
-  // Fallback to high card if no other hand type matches
   return {
-    handType: "highCard",
-    score: calculateScore("highCard"),
-    highCard: highestCard,
+    handType: handType,
+    score: scoreCalculation.finalScore,
+    calculation: scoreCalculation, // Include full calculation details
+    highCard: handType === "highCard" ? highestCard : undefined,
   };
 }
 
