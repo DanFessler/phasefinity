@@ -1,4 +1,6 @@
 import { ScoreState } from "../types/scoreTypes";
+import { useAppContext } from "../store/store";
+import { getHandTypeName } from "../utils/handTypeDisplay";
 import "./ScoreDisplay.css";
 
 interface ScoreDisplayProps {
@@ -6,8 +8,39 @@ interface ScoreDisplayProps {
 }
 
 function ScoreDisplay({ score }: ScoreDisplayProps) {
+  const { state } = useAppContext();
+  const coins = state.economy.coins;
+
   return (
     <div className="score-display">
+      {score.currentChips && score.currentMultiplier && (
+        <div className="score-calculation">
+          <div className="score-item">
+            <span className="score-label">Chips:</span>
+            <span className="score-value">{score.currentChips}</span>
+          </div>
+          <div className="score-item">
+            <span className="score-label">Multiplier:</span>
+            <span className="score-value">x{score.currentMultiplier.toFixed(1)}</span>
+          </div>
+          {score.bonusDescription && (
+            <div className="score-item score-item--bonus">
+              <div className="bonus-breakdown">
+                {score.bonusDescription.split(' • ').map((bonus, index) => (
+                  <div key={index} className="bonus-line">
+                    {bonus}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      
+      <div className="score-item">
+        <span className="score-label">Coins:</span>
+        <span className="score-value">🪙 {coins}</span>
+      </div>
       <div className="score-item">
         <span className="score-label">Score:</span>
         <span className="score-value">{score.currentScore}</span>
@@ -16,9 +49,9 @@ function ScoreDisplay({ score }: ScoreDisplayProps) {
         <span className="score-label">High Score:</span>
         <span className="score-value">{score.highScore}</span>
       </div>
-      {score.lastPlayScore > 0 && (
+      {score.lastPlayScore > 0 && score.lastPlayType && (
         <div className="score-item score-item--highlight">
-          <span className="score-label">{score.lastPlayType}:</span>
+          <span className="score-label">{getHandTypeName(score.lastPlayType)}:</span>
           <span className="score-value">+{score.lastPlayScore}</span>
         </div>
       )}

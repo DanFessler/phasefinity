@@ -1,57 +1,67 @@
-import { Card as CardType } from "../reducers/gameReducer";
-import { Dispatch, useEffect, useState } from "react";
+import { useState } from "react";
 import useWindowSize from "../hooks/useWindowSize";
-import Card from "./Card";
-import useMousePosition from "../hooks/useMousePosition";
+import Card from "./CardPhaseTen";
+import { useAppContext } from "../store/store";
+import { Card as CardType } from "../store/game/gameSlice";
+import useDealer from "../hooks/useDealer";
 
-type GameBoardProps = {
-  cardState: CardState;
-  dispatch: Dispatch<{ type: string; payload: unknown }>;
-};
+// GameBoard is the main component that renders the game board.
+// It uses the useAppContext hook to get the game state and dispatch actions.
+// It also uses the useWindowSize hook to get the window size.
+// It also uses the Card component to render the cards.
+// It also uses the Hand component to render the hands.
+// It also uses the HandLevel component to render the hand levels.
+// It also uses the Level component to render the levels.
 
-type CardState = {
-  handCards: CardType[];
-  boardCards: CardType[];
-  discardPile: CardType[];
-  deckCards: CardType[];
-  selectedCards: CardType[];
-};
+function GameBoard() {
+  const { state, dispatch } = useAppContext();
+  const { cards: StateCards } = state.game;
+  const { cards: allCards, isDealing } = useDealer(StateCards);
 
-function GameBoard({ cardState, dispatch }: GameBoardProps) {
   useWindowSize();
 
+  // Use isDealing to prevent interactions during card animations
+  const allowCardInteractions = !isDealing;
+
+  // We derive the different card piles from the single source of truth in the game state.
+  const handCards = allCards.filter((card) => card.position === "hand");
+  const boardCards = allCards.filter((card) => card.position === "board");
+  const discardPile = allCards.filter((card) => card.position === "discard");
+  const deckCards = allCards.filter((card) => card.position === "deck");
+
   const handleCardClick = (card: CardType) => {
+    // Don't allow card selection during dealing animations
+    if (!allowCardInteractions) return;
+    
     dispatch({
       type: "TOGGLE_CARD_SELECTION",
       payload: { id: card.id },
     });
   };
 
-  // one stupid consequence of rendering this way is vite doesn't hot reload the hand
-  const cards = [
+  const cardsToRender = [
     ...Hand({
-      cards: cardState.handCards,
-      yOffset: 250,
+      cards: handCards,
+      yOffset: 240,
       splayed: true,
       anchor: "bottom",
       onClick: handleCardClick,
     }),
     ...Hand({
-      cards: cardState.boardCards,
-      yOffset: 500,
+      cards: boardCards,
+      yOffset: 600, // placement of cards after they are played
       splayed: true,
       anchor: "bottom",
     }),
-    ...Hand({ cards: cardState.discardPile, yOffset: -100, anchor: "top" }),
-    ...Hand({ cards: cardState.deckCards, yOffset: 0, anchor: "bottom" }),
+    ...Hand({ cards: discardPile, yOffset: -100, anchor: "top" }),
+    ...Hand({ cards: deckCards, yOffset: 0, anchor: "bottom" }),
   ];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   // This line is critical to allow React to animate the cards
   // it's not enough that they have the same key, they must be in the same order
-  cards.sort((a: any, b: any) => a.key - b.key);
+  cardsToRender.sort((a, b) => Number(a.key) - Number(b.key));
 
-  return <>{cards}</>;
+  return <>{cardsToRender}</>;
 }
 
 type HandProps = {
@@ -88,8 +98,6 @@ function Hand({
     dragging: boolean;
   } | null>(null);
 
-  const { x: mouseX, y: mouseY } = useMousePosition();
-
   const anchoredYOffset = anchor === "top" ? yOffset : screenHeight - yOffset;
 
   const handleMouseDown = (
@@ -106,6 +114,8 @@ function Hand({
     const y = e.clientY - rect.top;
 
     setDragging({ card, offsetX: x, offsetY: y, x, y, dragging: false });
+
+    // Call onClick immediately on mouse down for responsive feel
     onClick?.(card);
 
     window.addEventListener("mousemove", handleMouseMove);
@@ -114,8 +124,8 @@ function Hand({
     function handleMouseMove(e: MouseEvent) {
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      setDragging((dragging: any) => ({
-        ...dragging,
+      setDragging((currentDragging) => ({
+        ...(currentDragging as NonNullable<typeof dragging>),
         dragging: true,
         x: x - e.movementX,
         y: y - e.movementY,
@@ -162,15 +172,9 @@ function Hand({
         style={{
           transform: `translate(${x}px, ${y}px) rotate(${cardRotation}deg)`,
           zIndex: isDragging ? 1000 : index,
-          opacity:
-            card.position === "discard" || card.position === "deck" ? 0 : 1,
+          opacity: card.position === "discard" ? 0 : 1,
         }}
         onMouseDown={(e) => handleMouseDown(card, e)}
-        onMouseUp={() => {
-          if (isDragging) {
-            onClick?.(card);
-          }
-        }}
       >
         <Card selected={card.selected} card={card} />
       </div>
